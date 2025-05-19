@@ -17,38 +17,54 @@ export default async function handler(req, res) {
   const form = new formidable.IncomingForm({ uploadDir: './public/uploads', keepExtensions: true });
 
   form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(500).json({ error: 'File parse error' });
+    if (err) {
+      console.error("Form parse error:", err);
+      return res.status(500).json({ error: 'File parse error' });
+    }
+
+    console.log("Fields:", fields);
+    console.log("Files:", files);
+
+    if (!fields.jobDescription || !files.cv) {
+      return res.status(400).json({ error: 'Missing job description or file' });
+    }
 
     const jobDescription = fields.jobDescription[0];
     const file = files.cv[0];
     let cvText = '';
 
-    if (file.mimetype === 'application/pdf') {
-      const data = await pdfParse(fs.readFileSync(file.filepath));
-      cvText = data.text;
-    } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      const data = await mammoth.extractRawText({ path: file.filepath });
-      cvText = data.value;
-    } else {
-      return res.status(400).json({ error: 'Unsupported file format' });
-    }
+    try {
+      if (file.mimetype === 'application/pdf') {
+        const data = await pdfParse(fs.readFileSync(file.filepath));
+        cvText = data.text;
+      } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const data = await mammoth.extractRawText({ path: file.filepath });
+        cvText = data.value;
+      } else {
+        return res.status(400).json({ error: 'Unsupported file format' });
+      }
 
-    const prompt = `You are an AI assistant. Compare the following job description and CV. Provide:
+      const prompt = `You are an AI assistant. Compare the following job description and CV. Provide:
 1. A match score (0 to 100) on how suitable the candidate is.
 2. A 3-sentence professional profile summary.
 
 Job Description: ${jobDescription}
 CV: ${cvText}`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-    });
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+      });
 
-    const output = completion.choices[0].message.content;
-    const matchScore = parseInt(output.match(/\d+/)?.[0] || '0');
-    const profileSummary = output.split('\n').slice(1).join(' ');
+      const output = completion.choices[0].message.content;
+      const matchScore = parseInt(output.match(/\d+/)?.[0] || '0');
+      const profileSummary = output.split('\n').slice(1).join(' ');
 
-    res.status(200).json({ matchScore, profileSummary });
+      res.status(200).json({ matchScore, profileSummary });
+
+    } catch (error) {
+      console.error("Error during processing:", error);
+      res.status(500).json({ error: 'Server error during analysis.' });
+    }
   });
 }
