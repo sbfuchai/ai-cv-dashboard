@@ -4,7 +4,13 @@ import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import { OpenAI } from 'openai';
 
-export const config = { api: { bodyParser: false } };
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+  },
+};
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
