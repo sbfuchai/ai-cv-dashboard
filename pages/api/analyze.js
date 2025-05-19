@@ -63,8 +63,8 @@ CV: ${cvText}`;
       res.status(200).json({ matchScore, profileSummary });
 
     } catch (error) {
-      console.error("Error during processing:", error);
-      res.status(500).json({ error: 'Server error during analysis.' });
+      console.error("🔥 Server Error:", error.message, error.stack);
+      res.status(500).json({ error: "Server error during analysis." });
     }
   });
 }
